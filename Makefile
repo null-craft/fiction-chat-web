@@ -4,9 +4,9 @@ PORT ?= "3000"
 .PHONY: deps build dev prod clean disable-telemetry
 
 dev: disable-telemetry
-	npx next dev --hostname ${HOST} --port ${PORT}
+	npx next dev --hostname ${HOST} --port ${PORT} --turbo
 dev-https: disable-telemetry
-	npx next dev --hostname ${HOST} --port ${PORT} --experimental-https
+	npx next dev --hostname ${HOST} --port ${PORT} --experimental-https --turbo
 build: disable-telemetry
 	npx next build
 prod: build

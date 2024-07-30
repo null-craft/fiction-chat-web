@@ -1,49 +1,74 @@
 'use client'
 // import Image from "next/image";
 import { CreateMLCEngine } from "@mlc-ai/web-llm";
-import { useEffect, useState } from "react";
+import { useState, useRef } from "react";
+import styles from "./main.module.css"
 
-const Home = props => {
-  const [message, setMessage] = useState("Loading")
-  useEffect(() => {
-    async function doStuff() {
-      const initProgressCallback = (initProgress) => {
-        console.log(initProgress)
-      }
-      const selectedModel = "SmolLM-135M-Instruct-q4f32_1-MLC";
-      const role = "Gandalf";
+const Home = () => {
+  const [messages, setMessages] = useState([
+        { role: "system", content: "You are LARPing as Gandalf from the Lord of the Rings." },
+  ])
+  const roleFormatOverrides = {
+    "user": "You",
+    "assistant": "Gandalf",
+  }
 
-      try {
-      const engine = await CreateMLCEngine(
+  const engine = useRef(null)
+  async function chat(newMessage) {
+    setMessages(messages.concat({role: "user", content: newMessage}))
+    const initProgressCallback = (initProgress) => {
+      console.log(initProgress)
+    }
+    const selectedModel = "SmolLM-135M-Instruct-q4f32_1-MLC"
+
+    try {
+      if (engine.current === null) {
+        engine.current = await CreateMLCEngine(
         selectedModel,
         { initProgressCallback: initProgressCallback }, // engineConfig
       );
-
-      const messages = [
-        { role: "system", content: "You are LARPing as Gandalf from Lord of the Rings." },
-        { role: "user", content: "Hi Gandalf!" },
-      ]
-
-      const reply = await engine.chat.completions.create({
-        messages,
+      }
+      const conversation = messages.concat({role: "user", content: newMessage})
+      const reply = await engine.current.chat.completions.create({
+        messages: conversation,
       });
       const replyMessage = reply.choices[0].message
-      setMessage(`${role || replyMessage.role}: ${replyMessage.content}`)
+      setMessages(conversation.concat([replyMessage]))
       console.log(reply.choices[0].message)
       console.log(reply.usage);
-      } catch (error) {
-        console.log(error.message)
-        setMessage(error.message)
-      }
-
+       
+    } catch (error) {
+      setMessages(messages.concat({role: "browser", content: error.message}))
     }
-    doStuff()
 
-  }, [])
+  }
 
+  const handleNewMessage = () => {
+    const chatInput = document.getElementById("chatInput")
+    const newMessage = chatInput.value
+    chatInput.value = ""
+    chat(newMessage)
+  }
+
+    
   return (
-    <main>
-      {message}
+    <main className={styles.mainCcontent}>
+
+      <div id="conversationHistory">
+        <ul>
+          {messages.map((msg, index) => {
+            if (!msg) return null
+            const msgRole = roleFormatOverrides[msg.role] || msg.role
+            if (msgRole === "system") {
+              return null
+            } else {
+              return <li key={`msg${index}`}>{msgRole}: {msg.content}</li>
+            }
+          })}
+        </ul>
+      </div>
+      <input type="text" id="chatInput" className={styles.chatInput} />
+      <button id="sendChatMessage" onClick={handleNewMessage}>Send</button>
     </main>
   );
 }
