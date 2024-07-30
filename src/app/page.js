@@ -1,21 +1,36 @@
 'use client'
 // import Image from "next/image";
 import { CreateMLCEngine } from "@mlc-ai/web-llm";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import styles from "./main.module.css"
 
 const Home = () => {
-  const [messages, setMessages] = useState([
-        { role: "system", content: "You are LARPing as Gandalf from the Lord of the Rings." },
-  ])
-  const roleFormatOverrides = {
+  const roleFormatOverrides = useRef({
     "user": "You",
-    "assistant": "Gandalf",
-  }
+  })
+  const characterConfig = "/characters/config.json"
+  const characterURLs = []
+  const [loading, setLoading] = useState(true)
+  useEffect(() => {
+    fetch(characterConfig)
+      .then(res => res.json())
+      .then((data) => {
+        data.urls.map(url => characterURLs.push(url))
+        fetch(characterURLs[0])
+          .then(characterData => characterData.json())
+          .then(loadedCharacterData => {
+            roleFormatOverrides.current.assistant = loadedCharacterData.name
+            setMessages([{ role: "system", content: `${loadedCharacterData.begin}\n Answer the user's questions with patience.` }])
+            setLoading(false)
+          })
+
+      })
+  }, [])
+  const [messages, setMessages] = useState([])
 
   const engine = useRef(null)
   async function chat(newMessage) {
-    setMessages(messages.concat({role: "user", content: newMessage}))
+    setMessages(messages.concat({ role: "user", content: newMessage }))
     const initProgressCallback = (initProgress) => {
       console.log(initProgress)
     }
@@ -24,11 +39,11 @@ const Home = () => {
     try {
       if (engine.current === null) {
         engine.current = await CreateMLCEngine(
-        selectedModel,
-        { initProgressCallback: initProgressCallback }, // engineConfig
-      );
+          selectedModel,
+          { initProgressCallback: initProgressCallback }, // engineConfig
+        );
       }
-      const conversation = messages.concat({role: "user", content: newMessage})
+      const conversation = messages.concat({ role: "user", content: newMessage })
       const reply = await engine.current.chat.completions.create({
         messages: conversation,
       });
@@ -36,9 +51,9 @@ const Home = () => {
       setMessages(conversation.concat([replyMessage]))
       console.log(reply.choices[0].message)
       console.log(reply.usage);
-       
+
     } catch (error) {
-      setMessages(messages.concat({role: "browser", content: error.message}))
+      setMessages(messages.concat({ role: "browser", content: error.message }))
     }
 
   }
@@ -50,15 +65,15 @@ const Home = () => {
     chat(newMessage)
   }
 
-    
-  return (
-    <main className={styles.mainCcontent}>
 
+  return (
+    <main className={styles.mainContent}>
+      {loading && <p>Loading...</p>}
       <div id="conversationHistory">
         <ul>
           {messages.map((msg, index) => {
             if (!msg) return null
-            const msgRole = roleFormatOverrides[msg.role] || msg.role
+            const msgRole = roleFormatOverrides.current[msg.role] || msg.role
             if (msgRole === "system") {
               return null
             } else {
@@ -68,7 +83,7 @@ const Home = () => {
         </ul>
       </div>
       <input type="text" id="chatInput" className={styles.chatInput} />
-      <button id="sendChatMessage" onClick={handleNewMessage}>Send</button>
+      <button id="sendChatMessage" onClick={handleNewMessage} disabled={loading}>Send</button>
     </main>
   );
 }
